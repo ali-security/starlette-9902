@@ -43,6 +43,7 @@ full = [
     "python-multipart>=0.0.18",
     "pyyaml",
     "httpx>=0.27.0,<0.29.0",
+    "backports.zstd; python_version < '3.14'",
 ]
 
 [dependency-groups]
