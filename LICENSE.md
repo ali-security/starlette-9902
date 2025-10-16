@@ -1,5 +1,4 @@
-Copyright © 2018, [Encode OSS Ltd](https://www.encode.io/).
-Copyright © 2025, Marcelo Trylesinski
+Copyright © 2018, Kim Christie, Marcelo Trylesinski and contributors.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
