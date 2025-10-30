@@ -8,14 +8,14 @@ on:
 jobs:
   publish:
     name: "Publish release"
-    runs-on: "ubuntu-latest"
+    runs-on: "ubuntu-22.04"
 
     environment:
       name: deploy
 
     steps:
       - uses: "actions/checkout@v3"
-      - uses: "actions/setup-python@v4"
+      - uses: "MatteoH2O1999/setup-python@v4"
         with:
           python-version: 3.7
       - name: "Install dependencies"
