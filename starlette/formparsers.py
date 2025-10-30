@@ -26,12 +26,12 @@ class FormMessage(Enum):
 class MultipartPart:
     content_disposition: typing.Optional[bytes] = None
     field_name: str = ""
-    data: bytes = b""
+    data: bytearray = field(default_factory=bytearray)
     file: typing.Optional[UploadFile] = None
     item_headers: typing.List[typing.Tuple[bytes, bytes]] = field(default_factory=list)
 
 
-def _user_safe_decode(src: bytes, codec: str) -> str:
+def _user_safe_decode(src: typing.Union[bytes, bytearray], codec: str) -> str:
     try:
         return src.decode(codec)
     except (UnicodeDecodeError, LookupError):
@@ -116,7 +116,8 @@ class FormParser:
 
 
 class MultiPartParser:
-    max_file_size = 1024 * 1024
+    max_file_size = 1024 * 1024  # 1MB
+    max_part_size = 1024 * 1024  # 1MB
 
     def __init__(
         self,
@@ -150,7 +151,9 @@ class MultiPartParser:
     def on_part_data(self, data: bytes, start: int, end: int) -> None:
         message_bytes = data[start:end]
         if self._current_part.file is None:
-            self._current_part.data += message_bytes
+            if len(self._current_part.data) + len(message_bytes) > self.max_part_size:
+                raise MultiPartException(f"Part exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+            self._current_part.data.extend(message_bytes)
         else:
             self._file_parts_to_write.append((self._current_part, message_bytes))
 

@@ -682,3 +682,36 @@ def test_max_fields_is_customizable_high(test_client_factory):
         "content": "",
         "content_type": None,
     }
+
+
+@pytest.mark.parametrize(
+    "app,expectation",
+    [
+        (app, pytest.raises(MultiPartException)),
+        (Starlette(routes=[Mount("/", app=app)]), does_not_raise()),
+    ],
+)
+def test_max_part_size_exceeds_limit(app, expectation, test_client_factory):
+    client = test_client_factory(app)
+    boundary = "------------------------4K1ON9fZkj9uCUmqLHRbbR"
+
+    multipart_data = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="small"\r\n\r\n'
+        "small content\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="large"\r\n\r\n'
+        + ("x" * 1024 * 1024 + "x")  # 1MB + 1 byte of data
+        + "\r\n"
+        f"--{boundary}--\r\n"
+    ).encode("utf-8")
+
+    headers = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Transfer-Encoding": "chunked",
+    }
+
+    with expectation:
+        response = client.post("/", data=multipart_data, headers=headers)
+        assert response.status_code == 400
+        assert response.text == "Part exceeded maximum size of 1024KB."

@@ -2,6 +2,7 @@ import datetime as dt
 import os
 import time
 from http.cookies import SimpleCookie
+from pathlib import Path
 
 import anyio
 import pytest
@@ -460,3 +461,54 @@ async def test_streaming_response_stops_if_receiving_http_disconnect():
     with anyio.move_on_after(1) as cancel_scope:
         await response({}, receive_disconnect, send)
     assert not cancel_scope.cancel_called, "Content streaming should stop itself."
+
+
+README = """\
+# BáiZé
+
+Powerful and exquisite WSGI/ASGI framework/toolkit.
+
+The minimize implementation of methods required in the Web framework. No redundant implementation means that you can freely customize functions without considering the conflict with baize's own implementation.
+
+Under the ASGI/WSGI protocol, the interface of the request object and the response object is almost the same, only need to add or delete `await` in the appropriate place. In addition, it should be noted that ASGI supports WebSocket but WSGI does not.
+"""  # noqa: E501
+
+
+@pytest.fixture
+def readme_file(tmp_path: Path) -> Path:
+    filepath = tmp_path / "README.txt"
+    filepath.write_bytes(README.encode("utf8"))
+    return filepath
+
+
+@pytest.fixture
+def file_response_client(readme_file: Path, test_client_factory):
+    return test_client_factory(app=FileResponse(str(readme_file)))
+
+
+def test_file_response_range_without_dash(file_response_client) -> None:
+    response = file_response_client.get("/", headers={"Range": "bytes=100, 0-50"})
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-50/{0}".format(len(README.encode("utf8")))
+
+
+def test_file_response_range_empty_start_and_end(file_response_client) -> None:
+    response = file_response_client.get("/", headers={"Range": "bytes= - , 0-50"})
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-50/{0}".format(len(README.encode("utf8")))
+
+
+def test_file_response_range_ignore_non_numeric(file_response_client) -> None:
+    response = file_response_client.get("/", headers={"Range": "bytes=abc-def, 0-50"})
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-50/{0}".format(len(README.encode("utf8")))
+
+
+def test_file_response_suffix_range(file_response_client) -> None:
+    # Test suffix range (last N bytes) - line 523 with empty start_str
+    response = file_response_client.get("/", headers={"Range": "bytes=-100"})
+    assert response.status_code == 206
+    file_size = len(README.encode("utf8"))
+    assert response.headers["content-range"] == "bytes {0}-{1}/{2}".format(file_size - 100, file_size - 1, file_size)
+    assert response.headers["content-length"] == "100"
+    assert response.content == README.encode("utf8")[-100:]

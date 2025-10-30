@@ -461,8 +461,19 @@ class UploadFile:
         if self.size is not None:
             self.size += len(data)
 
+        # Check if we're in memory AND if this write will cause a rollover
+        # SpooledTemporaryFile has _max_size attribute for checking the threshold
         if self._in_memory:
-            self.file.write(data)
+            # Check if adding this data would cause a rollover to disk
+            max_size = getattr(self.file, "_max_size", 0)
+            current_size = self.file.tell()
+            will_rollover = max_size > 0 and (current_size + len(data)) > max_size
+
+            if will_rollover:
+                # Use threadpool to avoid blocking during rollover
+                await run_in_threadpool(self.file.write, data)
+            else:
+                self.file.write(data)
         else:
             await run_in_threadpool(self.file.write, data)
 
